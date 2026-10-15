@@ -56,6 +56,12 @@
   #stage > #game-map {
     max-width: 30rem;
   }
+  /* The log card's edges line up with the buttons and the strip cards,
+     which sit 16px inside their boxes. */
+  #stage > #log {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
 }
 .map-svg {
   display: block;
@@ -252,7 +258,12 @@
 .log-list {
   margin: 0 16px;
 }
+/* The seat rows keep the log rows' layout: the dot and the name sit with
+   a gap between them, the dot on the text's centre line. */
 .log-what {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
   flex: 1;
 }

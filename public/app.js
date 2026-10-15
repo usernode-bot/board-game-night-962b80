@@ -60,6 +60,7 @@
 
   var view = null;
   var screen = 'title'; // or 'stage'
+  var failed = false; // the room request failed: the error state, until Retry
   var leftGameNo = null; // a game you stepped out of to the title screen
   var watching = false; // on the stage without playing
   // Your picks during the Challenge step, kept here between renders.
@@ -439,6 +440,12 @@
   }
 
   function render(next) {
+    // The first room request failed: the error state stands until Retry
+    // reloads the page. A view that still arrives (over the live
+    // connection, while plain requests are failing) does not replace it —
+    // the room's writes would fail too, so the screen keeps saying what
+    // happened instead of showing a lobby nobody can use.
+    if (failed) return;
     view = next;
     el.loading.hidden = true;
     el.error.hidden = true;
@@ -505,8 +512,12 @@
     },
     onFailed: function () {
       if (view) return;
+      failed = true;
       el.loading.hidden = true;
       el.error.hidden = false;
+      // The lobby body stays down: no seat list, no ready line.
+      el.lobbyBody.hidden = true;
+      el.leadersSection.hidden = true;
     },
   });
 
