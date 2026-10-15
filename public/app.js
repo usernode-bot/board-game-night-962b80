@@ -1,18 +1,16 @@
-// The board game's screen. The game room (public/game/room.js) keeps it up
-// to date over a live connection; this draws the room's view on two
+// Board Game Night's screen. The game room (public/game/room.js) keeps it
+// up to date over a live connection; this draws the room's view on two
 // screens:
 //
-// - the title screen: the game's name, the board lying on the table, and
-//   the lobby (who is at the table, join, start) with the leaderboard;
-// - the game, filling the screen: the board, everyone's chip along the top
-//   with whose turn it is, and the dice tray along the bottom. The results
-//   show over it when somebody wins.
+// - the title screen: the game's name, the map, and the lobby (who is at
+//   the table, join, start) with the leaderboard;
+// - the game, filling the screen: the map with every land's flag token,
+//   everyone's lands in the strip under it, and the turn's buttons and the
+//   turn log. The results show over the map when somebody wins.
 //
 // Every move goes to the server, whose rules (game/rules.js) decide what
-// happens; this page only shows it, stepping a piece square by square so a
-// roll can be followed. The board is one SVG drawn from the game's state
-// (its squares, shortcuts and slides), so a different board needs no new
-// drawing code.
+// happens; this page only shows it. The map is one SVG drawn from the MAP
+// the view carries, so there is no other drawing code.
 //
 // Rendering builds elements and sets textContent, never innerHTML with
 // people's words in it. Class names are whole literals so the Tailwind
@@ -22,11 +20,11 @@
   function $(id) { return document.getElementById(id); }
   var el = {
     title: $('title'),
-    titleBoard: $('title-board'),
+    titleMap: $('title-map'),
     loading: $('loading'),
     error: $('error'),
+    retry: $('retry'),
     lobbyBody: $('lobby-body'),
-    lobbyTitle: $('lobby-title'),
     lobbyNote: $('lobby-note'),
     players: $('players'),
     empty: $('empty'),
@@ -40,54 +38,33 @@
     leaders: $('leaders'),
     stage: $('stage'),
     toTitle: $('to-title'),
-    turnOrder: $('turn-order'),
-    board: $('board'),
-    die: $('die'),
-    turnLine: $('turn-line'),
-    turnNote: $('turn-note'),
-    roll: $('roll'),
+    stageNote: $('stage-note'),
+    pillDot: $('turn-pill-dot'),
+    pillText: $('turn-pill-text'),
+    map: $('map'),
+    strip: $('game-players'),
+    pick: $('pick'),
+    challenge: $('challenge'),
+    endTurn: $('end-turn'),
+    log: $('log'),
     over: $('over'),
     overLine: $('over-line'),
     standings: $('standings'),
     again: $('again'),
     overTitle: $('over-title'),
+    demoNote: $('demo-note'),
     connection: $('connection'),
     toast: $('toast'),
     toastText: $('toast-text'),
   };
 
-  // The scene's colours, the same as public/scene.css names: a board game
-  // looks the same in any room. Each seat has its piece's colour.
-  var C = {
-    wood: '#a86b35',
-    woodDeep: '#6b3f19',
-    paper: '#fbf3dc',
-    ink: '#3b2716',
-    inkSoft: '#8a6a4c',
-    gold: '#f6b93b',
-    goldDeep: '#c98a12',
-    coral: '#ee6b5a',
-    coralDeep: '#b8432f',
-    coralLight: '#ffc2b6',
-    rail: '#c48a4a',
-    railDeep: '#6b3f19',
-  };
-  var PIECE_COLOURS = ['#2f6fdf', '#e0457b', '#2ea05a', '#f08a24', '#8b5cf6', '#14a3b8'];
-  // Each row of the board has a tint; the squares between are paper.
-  var ROW_TINTS = ['#fde3a7', '#cfeccb', '#cde3f7', '#fbd2c4', '#e3d7f6'];
-  var DEFAULT = { squares: 30, shortcuts: { 3: 15, 8: 20, 12: 24, 21: 28 }, slides: { 16: 4, 23: 11, 27: 22, 29: 18 } };
-  var FACES = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
-  var STEP_MS = 140;
-
   var view = null;
   var screen = 'title'; // or 'stage'
   var leftGameNo = null; // a game you stepped out of to the title screen
   var watching = false; // on the stage without playing
-  // Where each piece is drawn, which trails the game while a move is shown.
-  var shown = {};
-  var animatedRoll = 0;
-  var stepping = null;
-  var rolling = false;
+  // Your picks during the Challenge step, kept here between renders.
+  var pickedFrom = null;
+  var pickedTo = null;
 
   function h(tag, className, text) {
     var node = document.createElement(tag);
@@ -107,34 +84,27 @@
   function isMe(id) {
     return !!(view && view.you && view.you.id === id);
   }
-  function who(id, username) {
-    return isMe(id) ? 'You' : '@' + username;
+  // The server writes the log in the third person; your own name reads
+  // better in the first person, and nobody's name carries an @ on screen.
+  function youify(text) {
+    var name = view && view.you ? view.you.username : null;
+    if (name) {
+      var escaped = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      text = text.replace(new RegExp('\\b' + escaped + '(?![A-Za-z0-9_])', 'gi'), 'you');
+      if (text.slice(0, 3) === 'you') text = 'Y' + text.slice(1);
+    }
+    return text;
   }
-  function colourOf(seat) {
-    return PIECE_COLOURS[seat % PIECE_COLOURS.length];
+  function seatOf(game, id) {
+    return game && game.seats[id] ? game.seats[id].seat : 0;
   }
-  function token(username, seat, small, away) {
-    var t = h('span', small ? 'token token-small' : 'token', username.charAt(0).toUpperCase());
-    if (away) t.classList.add('token-away');
-    t.style.backgroundColor = colourOf(seat);
-    t.setAttribute('aria-hidden', 'true');
-    return t;
-  }
-  function whereText(pos, squares) {
-    if (pos >= squares) return 'Finish';
-    return pos ? 'Square ' + pos : 'Start';
+  function seatClass(seat) {
+    return 'seat-' + (seat % 6);
   }
 
-  // ── The board, as one SVG ─────────────────────────────────────────────
+  // ── The map, as one SVG ───────────────────────────────────────────────
 
   var NS = 'http://www.w3.org/2000/svg';
-  var COLS = 6;
-  var CELL = 100; // a square's width; its height stretches to fill a tall screen
-  var GAP = 8;
-  var PAD = 22;
-  var LANE = 84;
-  var WIDTH = PAD * 2 + COLS * CELL + (COLS - 1) * GAP;
-
   function s(tag, attrs, parent) {
     var node = document.createElementNS(NS, tag);
     for (var k in attrs) node.setAttribute(k, attrs[k]);
@@ -142,372 +112,258 @@
     return node;
   }
 
-  // opts.lane: draw the start lane under the board (where pieces wait);
-  // opts.fit: stretch the squares to fill the space the board is given.
-  function makeBoard(svg, prefix, opts) {
-    var config = null;
-    var rows = 0;
-    var cellH = CELL;
-    var piecesLayer = null;
-    var pieceNodes = {};
+  function mapData() {
+    if (!view) return null;
+    return (view.game && view.game.map) || (view.rules && view.rules.map) || null;
+  }
+  function lanesData() {
+    if (!view) return [];
+    return (view.game && view.game.lanes) || (view.rules && view.rules.lanes) || [];
+  }
 
-    function fitHeight(forRows) {
-      if (!opts.fit) return CELL;
-      var box = svg.getBoundingClientRect();
-      if (!box.width || !box.height) return cellH;
-      var want = WIDTH * (box.height / box.width) - (opts.lane ? LANE : 0) - PAD * 2 - (forRows - 1) * GAP;
-      return Math.max(CELL, Math.min(190, Math.round(want / forRows)));
-    }
-
-    // Square n's centre: squares zigzag up from the bottom left, six a row.
-    function centre(n) {
-      var i = n - 1;
-      var r = Math.floor(i / COLS);
-      var c = i % COLS;
-      if (r % 2 === 1) c = COLS - 1 - c;
-      return { x: PAD + c * (CELL + GAP) + CELL / 2, y: PAD + (rows - 1 - r) * (cellH + GAP) + cellH / 2 };
-    }
-    function boardHeight() {
-      return PAD * 2 + rows * cellH + (rows - 1) * GAP;
-    }
-    // A piece at the start waits in the lane under the board.
-    function startSpot(k) {
-      return { x: PAD + 118 + k * 62, y: boardHeight() + LANE / 2 + 4 };
-    }
-
-    function ladder(layer, from, to) {
-      var a = centre(from);
-      var b = centre(to);
-      var dx = b.x - a.x;
-      var dy = b.y - a.y;
-      var len = Math.hypot(dx, dy);
-      var ux = dx / len;
-      var uy = dy / len;
-      var px = -uy * 17;
-      var py = ux * 17;
-      var x1 = a.x + ux * 14;
-      var y1 = a.y + uy * 14;
-      var x2 = b.x - ux * 14;
-      var y2 = b.y - uy * 14;
-      var g = s('g', { opacity: '0.95' }, layer);
-      var rungs = Math.max(2, Math.floor((len - 28) / 30));
-      [[C.railDeep, 9], [C.rail, 5]].forEach(function (stroke) {
-        for (var i = 1; i <= rungs; i++) {
-          var t = i / (rungs + 1);
-          var cx = x1 + (x2 - x1) * t;
-          var cy = y1 + (y2 - y1) * t;
-          s('line', { x1: cx - px, y1: cy - py, x2: cx + px, y2: cy + py, stroke: stroke[0], 'stroke-width': stroke[1], 'stroke-linecap': 'round' }, g);
-        }
-        [-1, 1].forEach(function (side) {
-          s('line', { x1: x1 + px * side, y1: y1 + py * side, x2: x2 + px * side, y2: y2 + py * side, stroke: stroke[0], 'stroke-width': stroke[1] + 2, 'stroke-linecap': 'round' }, g);
-        });
-      });
-    }
-
-    function slide(layer, from, to) {
-      var a = centre(from);
-      var b = centre(to);
-      var dx = b.x - a.x;
-      var dy = b.y - a.y;
-      var len = Math.hypot(dx, dy);
-      var px = -dy / len;
-      var py = dx / len;
-      var bend = Math.min(40, len * 0.2);
-      var d = 'M' + a.x + ' ' + a.y +
-        ' C' + (a.x + px * bend + dx * 0.25) + ' ' + (a.y + py * bend + dy * 0.25) +
-        ' ' + (b.x - px * bend - dx * 0.25) + ' ' + (b.y - py * bend - dy * 0.25) +
-        ' ' + b.x + ' ' + b.y;
-      var g = s('g', { opacity: '0.95' }, layer);
-      s('path', { d: d, fill: 'none', stroke: C.coralDeep, 'stroke-width': 30, 'stroke-linecap': 'round' }, g);
-      s('path', { d: d, fill: 'none', stroke: C.coral, 'stroke-width': 22, 'stroke-linecap': 'round' }, g);
-      s('path', { d: d, fill: 'none', stroke: C.coralLight, 'stroke-width': 5, 'stroke-linecap': 'round', 'stroke-dasharray': '2 14' }, g);
-      s('circle', { cx: a.x, cy: a.y, r: 17, fill: C.coralDeep }, g);
-      s('circle', { cx: a.x, cy: a.y, r: 11, fill: C.coral }, g);
-    }
-
-    function drawStatic(next, nextCellH) {
-      config = next;
-      rows = Math.ceil(config.squares / COLS);
-      cellH = nextCellH;
-      var width = WIDTH;
-      var height = boardHeight();
-      svg.setAttribute('viewBox', '0 0 ' + width + ' ' + (height + (opts.lane ? LANE : 0)));
-      while (svg.firstChild) svg.removeChild(svg.firstChild);
-
-      var defs = s('defs', {}, svg);
-      var wood = s('linearGradient', { id: prefix + '-wood', x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
-      s('stop', { offset: 0, 'stop-color': C.wood }, wood);
-      s('stop', { offset: 1, 'stop-color': C.woodDeep }, wood);
-      var gold = s('linearGradient', { id: prefix + '-gold', x1: 0, y1: 0, x2: 1, y2: 1 }, defs);
-      s('stop', { offset: 0, 'stop-color': '#ffe08a' }, gold);
-      s('stop', { offset: 1, 'stop-color': C.gold }, gold);
-      var gloss = s('radialGradient', { id: prefix + '-gloss', cx: '35%', cy: '30%', r: '65%' }, defs);
-      s('stop', { offset: 0, 'stop-color': '#fff', 'stop-opacity': 0.75 }, gloss);
-      s('stop', { offset: 0.5, 'stop-color': '#fff', 'stop-opacity': 0 }, gloss);
-
-      // The board: a wooden frame round a paper face.
-      s('rect', { x: 0, y: 0, width: width, height: height, rx: 28, fill: 'url(#' + prefix + '-wood)' }, svg);
-      s('rect', { x: 10, y: 10, width: width - 20, height: height - 20, rx: 20, fill: C.paper }, svg);
-
-      var squares = s('g', {}, svg);
-      for (var n = 1; n <= config.squares; n++) {
-        var p = centre(n);
-        var r = Math.floor((n - 1) / COLS);
-        var last = n === config.squares;
-        var fill = last ? 'url(#' + prefix + '-gold)' : ((n % 2) ? ROW_TINTS[r % ROW_TINTS.length] : '#fffaf0');
-        var cell = s('g', { 'data-square': String(n) }, squares);
-        s('rect', { x: p.x - CELL / 2, y: p.y - cellH / 2 + 4, width: CELL, height: cellH, rx: 14, fill: 'rgba(59,39,22,0.12)' }, cell);
-        s('rect', { x: p.x - CELL / 2, y: p.y - cellH / 2, width: CELL, height: cellH, rx: 14, fill: fill }, cell);
-        if (last) {
-          var star = s('text', { x: p.x, y: p.y + 12, 'text-anchor': 'middle', 'font-size': 44, fill: C.ink }, cell);
-          star.textContent = '★';
-          var label = s('text', { x: p.x, y: p.y + 38, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 800, fill: C.ink }, cell);
-          label.textContent = 'Finish';
-        }
-      }
-      var paths = s('g', {}, svg);
-      Object.keys(config.slides).forEach(function (k) { slide(paths, Number(k), config.slides[k]); });
-      Object.keys(config.shortcuts).forEach(function (k) { ladder(paths, Number(k), config.shortcuts[k]); });
-      // Numbers on top, haloed in paper so a ladder never hides one.
-      var numbers = s('g', { 'font-size': 19, 'font-weight': 800, fill: C.inkSoft, stroke: C.paper, 'stroke-width': 5, 'paint-order': 'stroke' }, svg);
-      for (var m = 1; m < config.squares; m++) {
-        var q = centre(m);
-        var num = s('text', { x: q.x - CELL / 2 + 11, y: q.y - cellH / 2 + 25 }, numbers);
-        num.textContent = String(m);
-      }
-      // The start lane.
-      if (opts.lane) {
-        var lane = s('g', {}, svg);
-        s('rect', { x: PAD, y: height + 12, width: 96, height: LANE - 18, rx: 18, fill: 'rgba(255,248,231,0.14)' }, lane);
-        var startLabel = s('text', { x: PAD + 48, y: height + 12 + (LANE - 18) / 2 + 6, 'text-anchor': 'middle', 'font-size': 18, 'font-weight': 800, fill: '#fff8e7' }, lane);
-        startLabel.textContent = 'Start';
-      }
-      piecesLayer = s('g', {}, svg);
-      pieceNodes = {};
-    }
-
-    function pieceNode(id, username, seat) {
-      var g = s('g', { class: 'piece', 'data-piece': String(id) }, piecesLayer);
-      s('circle', { class: 'piece-ring', r: 33, fill: 'none', stroke: C.gold, 'stroke-width': 5, opacity: 0 }, g);
-      s('ellipse', { cx: 0, cy: 22, rx: 22, ry: 7, fill: 'rgba(0,0,0,0.25)' }, g);
-      s('circle', { r: 25, fill: colourOf(seat), stroke: '#fff', 'stroke-width': 5 }, g);
-      s('circle', { r: 22, fill: 'url(#' + prefix + '-gloss)' }, g);
-      var t = s('text', { y: 8, 'text-anchor': 'middle', 'font-size': 24, 'font-weight': 800, fill: '#fff' }, g);
-      t.textContent = username.charAt(0).toUpperCase();
-      var title = s('title', {}, g);
-      title.textContent = '@' + username;
-      return g;
-    }
-
-    // pieces: [{ id, username, seat, pos, now }]
-    function place(all) {
-      // Without the lane, pieces at the start are not drawn.
-      var pieces = opts.lane ? all : all.filter(function (p) { return p.pos > 0; });
-      var at = {};
-      pieces.forEach(function (p) { (at[p.pos] = at[p.pos] || []).push(p); });
-      var keep = {};
-      pieces.forEach(function (p) {
-        keep[p.id] = true;
-        var node = pieceNodes[p.id];
-        if (!node) node = pieceNodes[p.id] = pieceNode(p.id, p.username, p.seat);
-        var group = at[p.pos];
-        var k = group.indexOf(p);
-        var x;
-        var y;
-        var scale = 1;
-        if (!p.pos) {
-          var spot = startSpot(k);
-          x = spot.x;
-          y = spot.y;
-        } else {
-          var c = centre(Math.min(p.pos, config.squares));
-          x = c.x;
-          y = c.y + 8;
-          if (group.length === 2) x += k ? 20 : -20;
-          else if (group.length > 2) {
-            var a = (k / group.length) * Math.PI * 2 - Math.PI / 2;
-            x += Math.cos(a) * 24;
-            y += Math.sin(a) * 20;
-            scale = 0.72;
-          }
-        }
-        node.style.transform = 'translate(' + x + 'px, ' + y + 'px) scale(' + scale + ')';
-        node.classList.toggle('piece-now', !!p.now);
-        node.querySelector('.piece-ring').setAttribute('opacity', p.now ? 1 : 0);
-        // The one whose turn it is stands on top.
-        if (p.now) piecesLayer.appendChild(node);
-      });
-      Object.keys(pieceNodes).forEach(function (id) {
-        if (!keep[id]) {
-          piecesLayer.removeChild(pieceNodes[id]);
-          delete pieceNodes[id];
-        }
-      });
-    }
-
+  function arrowBetween(a, b) {
+    var dx = b.cx - a.cx;
+    var dy = b.cy - a.cy;
+    var len = Math.sqrt(dx * dx + dy * dy) || 1;
+    var ux = dx / len;
+    var uy = dy / len;
+    var px = -uy;
+    var py = ux;
+    var sx = a.cx + ux * 15;
+    var sy = a.cy + uy * 15;
+    var ex = b.cx - ux * 15;
+    var ey = b.cy - uy * 15;
+    var mx = (sx + ex) / 2 - uy * 18;
+    var my = (sy + ey) / 2 + ux * 18;
     return {
-      draw: function (next, pieces) {
-        var h = fitHeight(Math.ceil(next.squares / COLS));
-        if (!config || Math.abs(h - cellH) > 1 || JSON.stringify(config) !== JSON.stringify(next)) drawStatic(next, h);
-        place(pieces);
-      },
+      curve: 'M' + sx + ' ' + sy + ' Q' + mx + ' ' + my + ' ' + ex + ' ' + ey,
+      head: 'M' + (ex - ux * 10 + px * 6) + ' ' + (ey - uy * 10 + py * 6) +
+        ' L' + ex + ' ' + ey +
+        ' L' + (ex - ux * 10 - px * 6) + ' ' + (ey - uy * 10 - py * 6),
     };
   }
 
-  var stageBoard = makeBoard(el.board, 'stage', { lane: true, fit: true });
-  var titleBoard = makeBoard(el.titleBoard, 'title', { lane: false, fit: false });
+  // g: the game's state as this viewer sees it, or null for the unclaimed
+  // map on the title screen. taps: whether the lands answer taps.
+  function drawMap(svg, g, taps) {
+    var map = mapData();
+    if (!map) return;
+    var lanes = lanesData();
+    var lands = g ? g.lands : null;
+    var seats = g ? g.seats : null;
+    var phase = view ? view.phase : null;
 
-  function boardConfig() {
-    var g = view && view.game;
-    return g ? { squares: g.squares, shortcuts: g.shortcuts, slides: g.slides } : DEFAULT;
-  }
+    svg.setAttribute('viewBox', '0 0 358 330');
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
 
-  function piecesNow() {
-    var g = view && view.game;
-    if (!g || view.phase === 'lobby') {
-      // The lobby's players wait at the start.
-      return (view ? view.players : []).map(function (p, seat) {
-        return { id: p.id, username: p.username, seat: seat, pos: 0, now: false };
-      });
+    var grid = s('g', {}, svg);
+    for (var i = 0; i < lanes.length; i++) {
+      s('path', { d: lanes[i][2], class: 'lane' }, grid);
     }
-    var current = view.phase === 'playing' ? g.order[g.turn % g.order.length] : null;
-    return g.order.map(function (id) {
-      var piece = g.pieces[id];
-      return { id: id, username: piece.username, seat: piece.seat, pos: shown[id] != null ? shown[id] : piece.pos, now: id === current };
-    });
-  }
 
-  function drawBoards() {
-    var pieces = piecesNow();
-    stageBoard.draw(boardConfig(), pieces);
-    titleBoard.draw(boardConfig(), pieces);
-  }
+    var shapes = s('g', {}, svg);
+    for (var n = 0; n < map.length; n++) {
+      var land = map[n];
+      var state = lands ? lands[land.id] : null;
+      var cls = 'land' + (state ? ' ' + seatClass(seatOf(g, state.owner)) : ' land-free');
+      var node = s('path', { d: land.path, class: cls, 'data-territory': land.id }, shapes);
+      if (taps && phase === 'playing' && !g.winner && isMe(currentId(g))) node.classList.add('land-tap');
+      // The picked land gets a thick outline, the target a dashed one.
+      if (state && land.id === pickedFrom) s('path', { d: land.path, class: 'land land-from' }, shapes);
+      if (state && land.id === pickedTo) s('path', { d: land.path, class: 'land land-to' }, shapes);
+    }
 
-  // ── The die and the tray ──────────────────────────────────────────────
-
-  function setDie(n) {
-    var on = FACES[n] || FACES[6];
-    var pips = el.die.children;
-    for (var i = 0; i < pips.length; i++) pips[i].classList.toggle('pip-on', on.indexOf(i) !== -1);
-    el.die.setAttribute('aria-label', n ? 'The die shows ' + n : 'The die');
-  }
-
-  // A new roll: the die tumbles, then the piece steps to where it landed and
-  // takes any shortcut or slide.
-  function showMove(move) {
-    clearInterval(stepping);
-    rolling = true;
-    el.die.classList.add('die-rolling');
-    var ticks = 0;
-    stepping = setInterval(function () {
-      ticks += 1;
-      if (ticks < 5) {
-        setDie(1 + Math.floor(Math.random() * 6));
-        return;
+    // A curved arrow from the picked land to the one it challenges.
+    if (g && pickedFrom && pickedTo) {
+      var from = null;
+      var to = null;
+      for (var m = 0; m < map.length; m++) {
+        if (map[m].id === pickedFrom) from = map[m];
+        if (map[m].id === pickedTo) to = map[m];
       }
-      el.die.classList.remove('die-rolling');
-      setDie(move.die);
-      var pos = shown[move.id] != null ? shown[move.id] : move.from;
-      if (pos < move.landed) shown[move.id] = pos + 1;
-      else if (pos !== move.to) shown[move.id] = move.to;
-      else {
-        clearInterval(stepping);
-        stepping = null;
-        rolling = false;
-        delete shown[move.id];
-        drawOver();
+      if (from && to) {
+        var arrow = arrowBetween(from, to);
+        s('path', { d: arrow.curve, class: 'arrow' }, shapes);
+        s('path', { d: arrow.head, class: 'arrow' }, shapes);
       }
-      drawBoards();
-      drawTray();
-      drawTurnOrder();
-    }, STEP_MS);
+    }
+
+    var tokens = s('g', {}, svg);
+    for (var t = 0; t < map.length; t++) {
+      var ld = map[t];
+      var st = lands ? lands[ld.id] : null;
+      var token = s('circle', { cx: ld.cx, cy: ld.cy, r: 12, class: 'token-circle', 'data-territory': ld.id }, tokens);
+      if (taps && st && phase === 'playing' && !g.winner && isMe(currentId(g))) token.classList.add('land-tap');
+      var num = s('text', { x: ld.cx, y: ld.cy + 4, class: 'token-num' }, tokens);
+      num.textContent = st ? String(st.flags) : '';
+      var title = s('title', {}, token);
+      title.textContent = ld.name + (st ? ', ' + st.flags + ' flags' : '');
+    }
   }
 
-  function drawTray() {
+  function currentId(g) {
+    return g.order[g.turn % g.order.length];
+  }
+
+  // ── The game screen ───────────────────────────────────────────────────
+
+  function drawStage() {
     var g = view.game;
-    if (!g) return;
     var playing = view.phase === 'playing';
-    var id = g.order[g.turn % g.order.length];
-    var mine = playing && isMe(id);
-    var player = view.players.filter(function (p) { return p.id === id; })[0];
-    if (!rolling) setDie(g.lastMove ? g.lastMove.die : 6);
-    if (!playing) {
-      el.turnLine.textContent = 'Game over';
-      el.turnNote.textContent = g.log.length ? g.log[0].text : '';
+    var over = view.phase === 'over';
+    var current = playing ? currentId(g) : null;
+    var mine = playing && isMe(current);
+    var step = g.step;
+
+    el.stageNote.textContent = playing
+      ? 'Round ' + g.round + ', ' + (step === 'place' ? 'place flags' : 'challenges')
+      : 'Game over';
+    if (current != null) {
+      el.pillDot.className = 'seat-dot ' + seatClass(seatOf(g, current));
+      el.pillText.textContent = mine ? 'Your turn' : (g.seats[current] ? g.seats[current].username : '?') + '\'s turn';
     } else {
-      el.turnLine.textContent = mine ? 'Your turn' : (g.pieces[id] ? '@' + g.pieces[id].username + '\'s turn' : '');
-      var last = !rolling && g.log.length ? g.log[0].text : '';
-      if (mine) el.turnNote.textContent = last ? last + '. Your roll.' : 'Roll the die to set off.';
-      else if (player && !player.here) el.turnNote.textContent = 'Away, so their roll is made for them.';
-      else el.turnNote.textContent = last || (watching ? 'You are watching this game.' : 'Waiting for them to roll.');
+      el.pillDot.className = 'seat-dot';
+      el.pillText.textContent = 'Nobody\'s turn';
     }
-    el.roll.hidden = !mine;
-    el.roll.disabled = rolling;
+
+    drawMap(el.map, g, true);
+
+    // Everyone's lands.
+    el.strip.textContent = '';
+    for (var i = 0; i < view.players.length; i++) {
+      var p = view.players[i];
+      var seat = seatOf(g, p.id);
+      var held = 0;
+      for (var key in g.lands) if (g.lands[key].owner === p.id) held += 1;
+      var card = h('div', 'pl' + (p.id === current ? ' on' : ''));
+      var name = h('div', 'pl-name');
+      var dot = h('span', 'seat-dot ' + seatClass(seat));
+      name.appendChild(dot);
+      name.appendChild(h('span', '', isMe(p.id) ? 'You' : p.username));
+      card.appendChild(name);
+      card.appendChild(h('div', 'pl-lands', held + (held === 1 ? ' land' : ' lands')));
+      el.strip.appendChild(card);
+    }
+
+    drawControls(g, playing, mine, step, current);
+    drawLog(g);
+    drawOver(g, over);
   }
 
-  function drawTurnOrder() {
-    var g = view.game;
-    el.turnOrder.textContent = '';
-    if (!g) return;
-    var current = view.phase === 'playing' ? g.order[g.turn % g.order.length] : null;
-    var here = {};
-    view.players.forEach(function (p) { here[p.id] = p.here; });
-    g.order.forEach(function (id) {
-      var piece = g.pieces[id];
-      var chip = h('li', id === current ? 'chip chip-now' : 'chip');
-      chip.setAttribute('data-turn', String(id));
-      chip.appendChild(token(piece.username, piece.seat, true, here[id] === false));
-      chip.appendChild(h('span', 'chip-name', who(id, piece.username)));
-      var pos = shown[id] != null ? shown[id] : piece.pos;
-      chip.appendChild(h('span', 'chip-where', here[id] === false ? 'away' : whereText(pos, g.squares)));
-      el.turnOrder.appendChild(chip);
-    });
+  function drawControls(g, playing, mine, step, current) {
+    var dice = 0;
+    if (mine && step === 'challenge' && pickedFrom) {
+      var from = g.lands[pickedFrom];
+      if (from && from.owner === view.you.id) dice = Math.min(3, from.flags - 1);
+      else { pickedFrom = null; pickedTo = null; }
+    }
+    var neighbour = mine && step === 'challenge' && pickedFrom && pickedTo &&
+      g.lands[pickedTo] && g.map.find(function (l) { return l.id === pickedFrom; }).next.indexOf(pickedTo) !== -1;
+
+    var showChallenge = false;
+    el.pick.textContent = '';
+    if (mine && step === 'place') {
+      el.pick.appendChild(h('span', '', 'Tap your lands to place '));
+      el.pick.appendChild(h('strong', '', String(g.reserve) + (g.reserve === 1 ? ' flag' : ' flags')));
+    } else if (mine && step === 'challenge') {
+      showChallenge = true;
+      if (pickedFrom && pickedTo) {
+        el.pick.appendChild(h('span', '', 'From '));
+        el.pick.appendChild(h('strong', '', landLabel(g, pickedFrom)));
+        el.pick.appendChild(h('span', '', ' to '));
+        el.pick.appendChild(h('strong', '', landLabel(g, pickedTo)));
+      } else if (pickedFrom) {
+        el.pick.appendChild(h('span', '', 'From '));
+        el.pick.appendChild(h('strong', '', landLabel(g, pickedFrom)));
+        el.pick.appendChild(h('span', '', '. Tap a land next door to challenge.'));
+      } else {
+        el.pick.textContent = 'Tap one of your lands with 2 or more flags.';
+      }
+    } else if (playing) {
+      var who = g.seats[current];
+      el.pick.textContent = (isMe(current) ? 'You are' : (who ? who.username + ' is' : 'Someone is')) +
+        ' playing' + (who && !playerHere(current) ? ', played for them' : '');
+    } else {
+      el.pick.textContent = 'The game is over.';
+    }
+
+    el.challenge.hidden = !showChallenge;
+    if (showChallenge) {
+      el.challenge.textContent = pickedFrom ? 'Challenge with ' + dice + ' dice' : 'Challenge';
+      el.challenge.disabled = !(pickedFrom && pickedTo && neighbour);
+    }
+    el.endTurn.disabled = !mine || (step === 'place' && g.reserve > 0);
   }
 
-  function drawOver() {
-    var done = view.phase === 'over' && view.results && !rolling;
+  function landLabel(g, id) {
+    var land = g.map.find(function (l) { return l.id === id; });
+    var st = g.lands[id];
+    return (land ? land.name : '?') + ' (' + (st ? st.flags : 0) + ')';
+  }
+  function playerHere(id) {
+    for (var i = 0; i < view.players.length; i++) if (view.players[i].id === id) return view.players[i].here;
+    return true;
+  }
+
+  function drawLog(g) {
+    el.log.textContent = '';
+    for (var i = 0; i < g.log.length; i++) {
+      var entry = g.log[i];
+      var li = h('li', 'list-row');
+      li.appendChild(h('span', 'seat-dot ' + seatClass(seatOf(g, entry.id))));
+      li.appendChild(h('span', 'log-what', youify(entry.text)));
+      if (entry.dice) li.appendChild(h('span', 'log-dice', entry.dice));
+      el.log.appendChild(li);
+    }
+  }
+
+  function drawOver(g, over) {
+    var done = over && view.results;
     el.over.hidden = !done;
     if (!done) return;
     var winner = view.results[0];
-    el.overLine.textContent = isMe(winner.id) ? 'You won!' : '@' + winner.username + ' won!';
+    el.overLine.textContent = isMe(winner.id) ? 'You won!' : winner.username + ' won!';
     el.standings.textContent = '';
-    var g = view.game;
-    view.results.forEach(function (r) {
-      var li = h('li', 'rank');
-      li.appendChild(h('span', 'rank-place', String(r.place)));
-      var seat = g && g.pieces[r.id] ? g.pieces[r.id].seat : r.place - 1;
-      li.appendChild(token(r.username, seat, true));
-      li.appendChild(h('span', 'min-w-0 flex-1 truncate font-bold', who(r.id, r.username)));
-      li.appendChild(h('span', 'pad-note', whereText(r.score, g ? g.squares : 30)));
+    for (var i = 0; i < view.results.length; i++) {
+      var r = view.results[i];
+      var li = h('li', 'list-row');
+      li.appendChild(h('span', 'text-small text-muted', String(r.place)));
+      var name = h('span', 'log-what font-semibold', isMe(r.id) ? 'You' : r.username);
+      li.appendChild(h('span', 'seat-dot ' + seatClass(seatOf(g, r.id))));
+      li.appendChild(name);
+      li.appendChild(h('span', 'log-dice', r.score + (r.score === 1 ? ' land' : ' lands')));
       el.standings.appendChild(li);
-    });
+    }
   }
 
   // ── The title screen ──────────────────────────────────────────────────
 
-  function drawLobby() {
+  function drawTitle() {
     var you = view.you;
     var joined = !!(you && you.joined);
     var phase = view.phase;
-    var g = view.game;
-    var max = view.rules.maxPlayers;
+
+    drawMap(el.titleMap, view.game, false);
 
     el.players.textContent = '';
-    view.players.forEach(function (p, seat) {
-      var li = h('li', 'seat');
+    for (var i = 0; i < view.players.length; i++) {
+      var p = view.players[i];
+      var li = h('li', 'list-row');
       li.setAttribute('data-player', String(p.id));
-      var s = g && g.pieces[p.id] && phase !== 'lobby' ? g.pieces[p.id].seat : seat;
-      li.appendChild(token(p.username, s, false, !p.here));
-      li.appendChild(h('span', 'seat-name', who(p.id, p.username)));
-      var note = !p.here ? 'away' : (g && g.pieces[p.id] && phase !== 'lobby' ? whereText(g.pieces[p.id].pos, g.squares) : 'ready');
-      li.appendChild(h('span', 'seat-note', note));
+      var name = h('span', 'log-what font-semibold');
+      name.appendChild(h('span', 'seat-dot ' + seatClass(i)));
+      name.appendChild(document.createTextNode(isMe(p.id) ? 'You' : p.username));
+      li.appendChild(name);
+      li.appendChild(h('span', 'log-dice', !p.here ? 'away' : phase === 'lobby' ? 'ready' : 'playing'));
       el.players.appendChild(li);
-    });
+    }
     if (phase === 'lobby' && view.players.length) {
-      for (var i = view.players.length; i < max; i++) {
-        var open = h('li', 'seat');
-        open.appendChild(h('span', 'seat-open', '+'));
-        open.appendChild(h('span', 'seat-note', 'Open seat'));
+      for (var n = view.players.length; n < view.rules.maxPlayers; n++) {
+        var open = h('li', 'list-row');
+        name = h('span', 'log-what text-muted');
+        name.appendChild(h('span', 'seat-dot'));
+        name.appendChild(document.createTextNode('Open seat'));
+        open.appendChild(name);
         el.players.appendChild(open);
       }
     }
@@ -517,7 +373,6 @@
     var lobby = phase === 'lobby';
     var on = phase === 'playing';
     var over = phase === 'over';
-    el.lobbyTitle.textContent = lobby ? 'Around the table' : on ? 'A game is on' : 'The last game is over';
     el.join.hidden = !lobby || joined;
     el.start.hidden = !lobby || !joined;
     el.start.disabled = view.players.length < view.rules.minPlayers;
@@ -529,9 +384,9 @@
 
     var note = '';
     if (!you) note = 'Make an account to play. You can watch any game.';
-    else if (lobby) note = joined ? 'Anyone at the table can start. Away players have their rolls made for them.' : 'Take a seat to play in the next game.';
+    else if (lobby) note = joined ? 'Anyone at the table can start. Away players have their turns played for them.' : 'Take a seat to play in the next game.';
     else if (on) note = joined ? 'You are playing.' : 'You can watch it, and join the next one.';
-    else if (view.results) note = (isMe(view.results[0].id) ? 'You' : '@' + view.results[0].username) + ' won it.';
+    else if (view.results) note = (isMe(view.results[0].id) ? 'You' : view.results[0].username) + ' won it.';
     el.lobbyNote.textContent = note;
     el.lobbyNote.hidden = !note;
   }
@@ -539,14 +394,15 @@
   function drawLeaders() {
     el.leadersSection.hidden = !view.leaders.length;
     el.leaders.textContent = '';
-    view.leaders.forEach(function (l, i) {
-      var li = h('li', 'rank');
+    for (var i = 0; i < view.leaders.length; i++) {
+      var l = view.leaders[i];
+      var li = h('li', 'list-row');
       li.setAttribute('data-leader', '');
-      li.appendChild(h('span', 'rank-place', String(i + 1)));
-      li.appendChild(h('span', 'min-w-0 flex-1 truncate font-bold', '@' + l.username));
-      li.appendChild(h('span', 'pad-note', l.wins + (l.wins === 1 ? ' win' : ' wins') + ' of ' + l.played));
+      li.appendChild(h('span', 'text-small text-muted', String(i + 1)));
+      li.appendChild(h('span', 'log-what font-semibold', l.username));
+      li.appendChild(h('span', 'log-dice', l.wins + (l.wins === 1 ? ' win' : ' wins') + ' of ' + l.played));
       el.leaders.appendChild(li);
-    });
+    }
   }
 
   // ── Which screen ──────────────────────────────────────────────────────
@@ -571,30 +427,57 @@
   }
 
   function render(next) {
-    var before = view;
     view = next;
     el.loading.hidden = true;
     el.error.hidden = true;
     el.lobbyBody.hidden = false;
-    var g = view.game;
-    // A roll this page has not shown yet.
-    if (g && g.lastMove && g.lastMove.rollNo > animatedRoll) {
-      var first = !before || !before.game || before.gameNo !== view.gameNo;
-      animatedRoll = g.lastMove.rollNo;
-      if (!first && screen === 'stage') {
-        shown[g.lastMove.id] = g.lastMove.from;
-        showMove(g.lastMove);
-      }
+    // Your picks are yours only while it is your Challenge step.
+    if (!(view.phase === 'playing' && view.game && !view.game.winner &&
+          view.game.order[view.game.turn % view.game.order.length] === view.you.id &&
+          view.game.step === 'challenge')) {
+      pickedFrom = null;
+      pickedTo = null;
     }
-    if (!g) { animatedRoll = 0; shown = {}; }
+    // The staging demo's line.
+    var demo = !!(view.game && view.game.demo);
+    el.demoNote.hidden = !demo;
+    document.body.classList.toggle('demo-on', demo);
+
     chooseScreen();
-    drawBoards();
-    drawTray();
-    drawTurnOrder();
-    drawOver();
-    drawLobby();
+    drawTitle();
     drawLeaders();
+    if (screen === 'stage') drawStage();
   }
+
+  // ── Taps on the map ───────────────────────────────────────────────────
+
+  function onLandTap(id) {
+    var g = view && view.game;
+    if (!g || view.phase !== 'playing' || g.winner != null) return;
+    if (!isMe(currentId(g))) return;
+    var st = g.lands[id];
+    if (!st) return;
+    if (g.step === 'place') {
+      if (st.owner !== view.you.id) { toast('Choose one of your own lands.'); return; }
+      room.act({ type: 'place', land: id });
+    } else if (g.step === 'challenge') {
+      if (st.owner === view.you.id) {
+        if (st.flags < 2) { toast('A land needs at least 2 flags to challenge.'); return; }
+        pickedFrom = id;
+        pickedTo = null;
+      } else if (pickedFrom) {
+        var land = g.map.find(function (l) { return l.id === pickedFrom; });
+        if (land && land.next.indexOf(id) !== -1) pickedTo = id;
+        else { toast('That land is not next door, or across a sea lane.'); return; }
+      } else {
+        toast('Tap one of your lands first.');
+        return;
+      }
+      drawStage();
+    }
+  }
+
+  // ── Wiring ────────────────────────────────────────────────────────────
 
   var room = window.GameRoom.connect({
     onView: render,
@@ -610,11 +493,19 @@
     },
   });
 
-  setDie(6);
-  drawBoards();
-  window.addEventListener('resize', function () { if (view) drawBoards(); });
-
-  el.roll.addEventListener('click', function () { el.roll.disabled = true; room.act({ type: 'roll' }); });
+  el.map.addEventListener('click', function (e) {
+    var target = e.target.closest ? e.target.closest('[data-territory]') : null;
+    if (target) onLandTap(target.getAttribute('data-territory'));
+  });
+  el.challenge.addEventListener('click', function () {
+    if (!pickedFrom || !pickedTo) return;
+    el.challenge.disabled = true;
+    room.act({ type: 'challenge', from: pickedFrom, to: pickedTo });
+  });
+  el.endTurn.addEventListener('click', function () {
+    el.endTurn.disabled = true;
+    room.act({ type: 'end' });
+  });
   el.join.addEventListener('click', function () { room.join(); });
   el.start.addEventListener('click', function () { leftGameNo = null; room.start(); });
   el.leave.addEventListener('click', function () { room.leave(); show('title'); });
@@ -627,11 +518,5 @@
   });
   el.again.addEventListener('click', function () { leftGameNo = null; room.again(); });
   el.overTitle.addEventListener('click', function () { show('title'); });
-  $('retry').addEventListener('click', function () { window.location.reload(); });
-  document.addEventListener('keydown', function (e) {
-    if (screen === 'stage' && (e.key === ' ' || e.key === 'Enter') && !el.roll.hidden && !el.roll.disabled && document.activeElement === document.body) {
-      e.preventDefault();
-      el.roll.click();
-    }
-  });
+  el.retry.addEventListener('click', function () { window.location.reload(); });
 })();

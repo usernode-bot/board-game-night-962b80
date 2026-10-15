@@ -14,6 +14,13 @@ const rules = require('./game/rules');
 
 const IS_STAGING = process.env.USERNODE_ENV === 'staging';
 
+// The staging demo's made-up players (ids rules.demoGame seats too).
+const DEMO_PLAYERS = [
+  { id: 900011, username: 'Maya' },
+  { id: 900012, username: 'Dev' },
+  { id: 900013, username: 'Lena' },
+];
+
 const room = new Room(rules);
 
 async function migrate(pool) {
@@ -43,6 +50,19 @@ async function migrate(pool) {
 }
 
 function routes(app) {
+  // Staging only: ?demo=1 seats the viewer at a fixed mid-game table
+  // (rules.demoGame) with three made-up players, so the populated game can
+  // be seen and checked without five real people. Idempotent: it does
+  // nothing while a game is on or over. Never runs in production.
+  if (IS_STAGING) {
+    app.get('/api/room', (req, res, next) => {
+      if (req.query.demo === '1' && req.user && room.state.phase === 'lobby') {
+        room.state.players = [{ id: req.user.id, username: req.user.username }].concat(DEMO_PLAYERS);
+        room.useState(rules.demoGame({ id: req.user.id, username: req.user.username }));
+      }
+      next();
+    });
+  }
   room.routes(app);
 }
 

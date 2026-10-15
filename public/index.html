@@ -16,7 +16,6 @@
         if (v === null) return 'null';
         if (typeof v === 'string') return v;
         if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-        if (typeof v === 'function') return '[Function ' + (v.name || 'anonymous') + ']';
         if (v instanceof Error) return (v.stack || (v.name + ': ' + v.message));
         if (depth > 3) return '[…]';
         var seen = new WeakSet();
@@ -26,7 +25,6 @@
             seen.add(val);
           }
           if (typeof val === 'function') return '[Function ' + (val.name || 'anonymous') + ']';
-          if (val instanceof Error) return val.stack || (val.name + ': ' + val.message);
           return val;
         });
       } catch (e) { try { return String(v); } catch (_) { return '[unserializable]'; } }
@@ -75,8 +73,9 @@
        called. -->
   <script src="/usernode-bridge/v1/bridge.js"></script>
   <!-- Follow the viewer's Homeroom theme (the bridge reports it), with the
-       OS preference as the fallback outside Homeroom. The game's scene keeps
-       its own look in both; the kit's parts (the toast, an error) follow it. -->
+       OS preference as the fallback outside Homeroom. The map is a scene of
+       its own, but it is drawn from the same tokens, so it follows both
+       looks too. -->
   <script>
     (function () {
       var media = window.matchMedia('(prefers-color-scheme: dark)');
@@ -92,98 +91,95 @@
   </script>
 </head>
 <body class="min-h-screen bg-ground text-fg">
-  <!-- The title screen: the game's name, its board on the table, and the
-       lobby. Everyone lands here, and a game starts from here. -->
-  <div id="title" class="scene fixed inset-0 overflow-y-auto">
-    <main class="mx-auto flex min-h-full max-w-md flex-col items-center gap-5 px-4 pb-10 pt-12">
+  <!-- The title screen: the game's name, the map, and the lobby. Everyone
+       lands here, and a game starts from here. -->
+  <div id="title" class="fixed inset-0 overflow-y-auto">
+    <main class="page-column mx-auto flex min-h-full max-w-md flex-col gap-5 px-4 pb-10 pt-10">
       <h1 class="title-name">Board Game Night</h1>
-      <p class="title-line">Roll the die, climb the ladders, mind the slides, and be the first to the finish.</p>
-      <svg id="title-board" class="title-board" aria-hidden="true"></svg>
+      <p class="title-line">Claim lands on the map, challenge your neighbours with dice, and be the last one holding land.</p>
+      <div class="map-frame" aria-hidden="true"><svg id="title-map" class="map-svg" role="img" aria-label="The map"></svg></div>
 
-      <section id="lobby" class="pad flex flex-col gap-4" aria-live="polite">
+      <section id="lobby" aria-live="polite">
         <!-- Loading: shapes where the table will be. -->
-        <div id="loading" class="flex flex-col gap-4" aria-label="Loading">
-          <div class="skeleton h-6 w-40"></div>
-          <div class="flex gap-6">
-            <div class="skeleton h-12 w-12 rounded-full"></div>
-            <div class="skeleton h-12 w-12 rounded-full"></div>
-            <div class="skeleton h-12 w-12 rounded-full"></div>
-          </div>
-          <div class="skeleton h-12 w-full rounded-full"></div>
+        <div id="loading" class="flex flex-col gap-3" aria-label="Loading">
+          <div class="skeleton h-5 w-36"></div>
+          <div class="list"><div class="list-row"><div class="skeleton h-5 w-40"></div></div><div class="list-row"><div class="skeleton h-5 w-28"></div></div></div>
+          <div class="skeleton h-11 w-full rounded-lg"></div>
         </div>
 
         <!-- Error: only when the first load failed. -->
         <div id="error" class="state-error" hidden>
-          <p class="pad-title">The game did not load</p>
-          <p class="pad-note">Nothing is lost. Check your connection and try again.</p>
-          <button id="retry" type="button" class="btn-quiet">Retry</button>
+          <p class="text-heading font-semibold">The game did not load</p>
+          <p class="text-small text-muted">Nothing is lost. Check your connection and try again.</p>
+          <button id="retry" type="button" class="btn-secondary">Retry</button>
         </div>
 
-        <div id="lobby-body" class="flex flex-col gap-4" hidden>
-          <div class="flex flex-col gap-1">
-            <h2 id="lobby-title" class="pad-title">Around the table</h2>
-            <p id="lobby-note" class="pad-note"></p>
-          </div>
-          <ul id="players" class="seats"></ul>
+        <div id="lobby-body" class="flex flex-col gap-3" hidden>
+          <p id="lobby-note" class="text-small text-muted"></p>
+          <ul id="players" class="list"></ul>
           <!-- Empty: only when nobody has joined yet. -->
-          <div id="empty" class="state-empty py-2" hidden>
-            <p class="pad-title">Nobody has joined yet</p>
-            <p class="pad-note">Join, and start a game on your own or wait for the others.</p>
+          <div id="empty" class="state-empty" hidden>
+            <p class="text-heading font-semibold">Nobody has joined yet</p>
+            <p class="text-small text-muted">Join, and start a game on your own or wait for the others.</p>
           </div>
           <div id="lobby-actions" class="flex flex-wrap gap-2">
-            <button id="join" type="button" class="btn-gold flex-1">Join the game</button>
-            <button id="start" type="button" class="btn-gold flex-1">Start the game</button>
-            <button id="watch" type="button" class="btn-gold flex-1" hidden>Watch the game</button>
-            <button id="resume" type="button" class="btn-gold flex-1" hidden>Back to the game</button>
-            <button id="new-game" type="button" class="btn-gold flex-1" hidden>New game</button>
-            <button id="leave" type="button" class="btn-quiet">Leave</button>
+            <button id="join" type="button" class="btn-primary flex-1">Join the game</button>
+            <button id="start" type="button" class="btn-primary flex-1">Start the game</button>
+            <button id="watch" type="button" class="btn-secondary flex-1" hidden>Watch the game</button>
+            <button id="resume" type="button" class="btn-secondary flex-1" hidden>Back to the game</button>
+            <button id="new-game" type="button" class="btn-secondary flex-1" hidden>New game</button>
+            <button id="leave" type="button" class="btn-secondary">Leave</button>
           </div>
         </div>
       </section>
 
-      <section id="leaders-section" class="pad flex flex-col gap-1" hidden>
-        <h2 class="pad-title">Most wins</h2>
-        <ol id="leaders" class="ranks"></ol>
+      <section id="leaders-section" class="flex flex-col gap-2" hidden>
+        <h2 class="section-label">Most wins</h2>
+        <ol id="leaders" class="list"></ol>
       </section>
     </main>
   </div>
 
-  <!-- The game: the table fills the screen, with everyone's chip along the
-       top and the dice tray along the bottom. -->
-  <div id="stage" class="scene fixed inset-0 flex flex-col" hidden>
-    <header class="flex items-center gap-2 px-3 pt-3">
+  <!-- The game: the map fills the screen, with everyone's lands under the
+       header, the turn's buttons under the map, and the turn log at the
+       foot. -->
+  <div id="stage" class="fixed inset-0 overflow-y-auto" hidden>
+    <header class="stage-head">
       <button id="to-title" type="button" class="btn-disc" aria-label="Back to the title screen">&lsaquo;</button>
-      <ol id="turn-order" class="flex min-w-0 flex-1 gap-2 overflow-x-auto px-1 py-1.5" aria-label="Turn order"></ol>
+      <div class="min-w-0">
+        <small id="stage-note" class="stage-note"></small>
+        <b class="stage-name">Board Game Night</b>
+      </div>
+      <div id="turn-pill" class="turn-pill"><span id="turn-pill-dot" class="seat-dot" aria-hidden="true"></span><span id="turn-pill-text"></span></div>
     </header>
-    <div class="relative min-h-0 flex-1 px-2 py-3">
-      <svg id="board" class="board-svg" role="img" aria-label="The board"></svg>
+    <div id="game-map" class="map-frame map-stage">
+      <svg id="map" class="map-svg" role="img" aria-label="The map"></svg>
     </div>
-    <footer id="turn" class="tray">
-      <div id="die" class="die" role="img" aria-label="The die">
-        <span class="pip"></span><span class="pip"></span><span class="pip"></span>
-        <span class="pip"></span><span class="pip"></span><span class="pip"></span>
-        <span class="pip"></span><span class="pip"></span><span class="pip"></span>
-      </div>
-      <div class="min-w-0 flex-1" aria-live="polite">
-        <p id="turn-line" class="tray-line"></p>
-        <p id="turn-note" class="tray-note"></p>
-      </div>
-      <button id="roll" type="button" class="btn-gold" hidden>Roll</button>
-    </footer>
+    <div id="game-players" class="player-strip"></div>
+    <p id="pick" class="pick" aria-live="polite"></p>
+    <div class="act">
+      <button id="challenge" type="button" class="btn-primary flex-1" hidden>Challenge</button>
+      <button id="end-turn" type="button" class="btn-secondary flex-1">End turn</button>
+    </div>
+
+    <h2 class="section-label">Turn log</h2>
+    <ul id="log" class="list log-list"></ul>
 
     <!-- The end of a game: who won, and everyone's place. -->
     <div id="over" class="veil" hidden>
-      <div class="pad flex max-w-sm flex-col gap-3" role="dialog" aria-labelledby="over-line">
-        <p class="trophy" aria-hidden="true">🏆</p>
-        <p id="over-line" class="pad-title text-center"></p>
-        <ol id="standings" class="ranks"></ol>
+      <div class="over-pad flex max-w-sm flex-col gap-3" role="dialog" aria-labelledby="over-line">
+        <p id="over-line" class="text-heading text-center"></p>
+        <ol id="standings" class="list"></ol>
         <div class="flex flex-wrap gap-2 pt-1">
-          <button id="again" type="button" class="btn-gold flex-1">Play again</button>
-          <button id="over-title" type="button" class="btn-quiet">Title screen</button>
+          <button id="again" type="button" class="btn-primary flex-1">Play again</button>
+          <button id="over-title" type="button" class="btn-secondary">Title screen</button>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- The staging demo's own line (api.js sets it up with ?demo=1). -->
+  <p id="demo-note" class="demo-note" data-usernode-demo-note hidden>Staging demo</p>
 
   <!-- Only when the live connection is lost. -->
   <p id="connection" class="fixed left-1/2 top-3 z-40 -translate-x-1/2 rounded-full bg-fg px-3 py-1 text-small text-ground" role="status" hidden></p>

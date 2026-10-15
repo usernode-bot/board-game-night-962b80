@@ -24,6 +24,8 @@
 
 (function () {
   var token = new URLSearchParams(window.location.search).get('token') || '';
+  // The staging demo travels with the page's own ?demo=1.
+  var DEMO = new URLSearchParams(window.location.search).get('demo') === '1' ? '?demo=1' : '';
 
   function api(method, url, body) {
     var headers = { 'x-usernode-token': token };
@@ -78,7 +80,7 @@
 
     function poll() {
       if (live || room.away()) return schedulePoll();
-      api('GET', '/api/room').then(function (v) {
+      api('GET', '/api/room' + DEMO).then(function (v) {
         setView(v);
         if (!live) setStatus('asking');
       }, function () {
@@ -182,7 +184,7 @@
 
     // The first view comes over a plain request, so the screen fills even
     // before (or without) the live connection; then the connection opens.
-    api('GET', '/api/room').then(function (v) {
+    api('GET', '/api/room' + DEMO).then(function (v) {
       setView(v);
       setStatus('asking');
     }, function (err) {

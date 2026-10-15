@@ -55,6 +55,19 @@ module.exports = {
         danger: token('danger'),
         'on-danger': token('on-danger'),
         focus: token('focus'), // the keyboard focus ring
+        sea: token('sea'), // the water between the regions
+        land: token('land'), // unclaimed land, flag tokens
+        // The player colours, the same in both looks.
+        p1: token('p1'),
+        p2: token('p2'),
+        p3: token('p3'),
+        p4: token('p4'),
+        p5: token('p5'),
+        p6: token('p6'),
+      },
+      // The whole app is set in the rounded system face, the map included.
+      fontFamily: {
+        sans: ['ui-rounded', 'SF Pro Rounded', 'Nunito', 'Varela Round', 'system-ui', 'sans-serif'],
       },
       // The type scale: four sizes, and nothing in between.
       fontSize: {

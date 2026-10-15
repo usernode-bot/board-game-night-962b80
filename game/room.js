@@ -127,6 +127,19 @@ class Room extends EventEmitter {
     }
   }
 
+  /**
+   * Put a ready-made game on the table, mid-flight: the staging demo
+   * (api.js, ?demo=1) builds one with rules.demoGame and seats its players
+   * itself. Idempotent at the caller; never in production.
+   */
+  useState(game) {
+    const st = this.state;
+    st.phase = 'playing';
+    st.game = game;
+    this.startClocks();
+    return this.changed();
+  }
+
   fresh() {
     const open = !!this.rules.open;
     return {
@@ -228,6 +241,9 @@ class Room extends EventEmitter {
         dropIn: !!this.rules.dropIn,
         live: !!this.rules.live,
         leaderboard: this.rules.leaderboard || null,
+        // The board itself, so a screen can draw it before any game is on.
+        map: this.rules.MAP || null,
+        lanes: this.rules.LANES || null,
       },
     };
   }
