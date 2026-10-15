@@ -77,14 +77,15 @@ function attach(server, room) {
       socket.destroy();
       return;
     }
-    wss.handleUpgrade(req, socket, head, (ws) => opened(ws, who.user || null));
+    wss.handleUpgrade(req, socket, head, (ws) =>
+      opened(ws, who.user || null, url.searchParams.get('demo') === '1'));
   });
 
-  function opened(ws, user) {
-    const client = { ws, user, alive: true, window: 0, count: 0 };
+  function opened(ws, user, demo) {
+    const client = { ws, user, demo: !!demo, alive: true, window: 0, count: 0 };
     clients.add(client);
     room.connect(user);
-    send(ws, { t: 'view', view: room.viewFor(user) });
+    send(ws, { t: 'view', view: room.viewFor(user, client.demo) });
 
     ws.on('pong', () => { client.alive = true; });
     ws.on('message', async (data) => {
@@ -123,7 +124,7 @@ function attach(server, room) {
   // Everyone gets their own view after a change: a view can hide things
   // (the answer to a question) from some players and not others.
   room.on('change', () => {
-    for (const c of clients) send(c.ws, { t: 'view', view: room.viewFor(c.user) });
+    for (const c of clients) send(c.ws, { t: 'view', view: room.viewFor(c.user, c.demo) });
   });
   room.on('frame', (frame) => {
     const msg = JSON.stringify({ t: 'frame', frame });

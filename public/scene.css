@@ -37,6 +37,26 @@
   margin: 0 12px;
   flex: none;
 }
+/* A wider window keeps the stage one centred column about the width of
+   the phone's, so the map never stretches across the whole screen and
+   the strip, buttons and log stay with it. */
+@media (min-width: 640px) {
+  #stage > header,
+  #stage > #game-map,
+  #stage > #game-players,
+  #stage > #pick,
+  #stage > .act,
+  #stage > .section-label,
+  #stage > #log {
+    width: 100%;
+    max-width: 34rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  #stage > #game-map {
+    max-width: 30rem;
+  }
+}
 .map-svg {
   display: block;
   width: 100%;
@@ -101,11 +121,14 @@
 .seat-4 { --seat: var(--p5); }
 .seat-5 { --seat: var(--p6); }
 
-/* The round flag-count token on every land. */
+/* The round flag-count token on every land. It never takes the tap
+   itself: the land underneath does, so the token is not one more
+   [data-territory]. */
 .token-circle {
   fill: rgb(var(--land));
   stroke: rgb(var(--fg));
   stroke-width: 1.5;
+  pointer-events: none;
 }
 .token-num {
   font-size: 12px;

@@ -94,13 +94,21 @@
   .btn-secondary {
     @apply inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg px-4 text-body font-medium
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
-      focus-visible:ring-offset-ground disabled:cursor-not-allowed disabled:opacity-50;
+      focus-visible:ring-offset-ground disabled:cursor-not-allowed;
   }
   .btn-primary {
     @apply bg-accent text-on-accent hover:brightness-95;
   }
   .btn-secondary {
     @apply border border-line bg-surface text-fg hover:bg-raised;
+  }
+  /* A button that cannot be pressed yet stays solid: the primary rests on
+     the raised colour in muted text, not an alpha-faded fill. */
+  .btn-primary:disabled {
+    @apply border border-line bg-raised text-muted opacity-100;
+  }
+  .btn-secondary:disabled {
+    @apply opacity-50;
   }
 
   /* Text inputs, selects and textareas: <input class="field">, 44 px tall.
@@ -126,9 +134,10 @@
     @apply rounded-xl border border-line bg-surface p-4;
   }
 
-  /* The label above a section: sentence case, never uppercase or tracked. */
+  /* The label above a section: sentence case, never uppercase or tracked.
+     Its edges line up with the list below it and the column's gutter. */
   .section-label {
-    @apply mb-2 px-1 text-small font-medium text-muted;
+    @apply mb-2 mt-4 px-4 text-small font-medium text-muted;
   }
 
   /* The states of anything that loads data. Show exactly one at a time:

@@ -215,24 +215,34 @@ class Room extends EventEmitter {
     return this.state.players.find((p) => p.id === id) || null;
   }
 
-  viewFor(viewer) {
+  /**
+   * What one viewer sees. `demo` (the ?demo=1 answers) opts into the
+   * staging demo when it is on the table; every other answer sees the
+   * lobby underneath it, so a plain page is never handed a demo game.
+   */
+  viewFor(viewer, demo = false) {
     const st = this.state;
+    const demoOn = !!(st.game && st.game.demo);
+    const shown = demoOn && !demo
+      ? { phase: 'lobby', players: st.lobbyPlayers || st.players, game: null, results: null }
+      : st;
+    const players = shown.players || [];
     const id = viewer ? viewer.id : null;
     const watching = [];
     for (const [uid, h] of this.here) {
-      if (this.isHere(uid) && !this.playerOf(uid)) watching.push({ id: uid, username: h.username });
+      if (this.isHere(uid) && !players.find((p) => p.id === uid)) watching.push({ id: uid, username: h.username });
     }
     return {
       version: this.version,
       // The server's clock, so a page can count down a deadline in the game.
       now: this.now(),
-      phase: st.phase,
+      phase: shown.phase,
       gameNo: st.gameNo,
-      players: st.players.map((p) => ({ id: p.id, username: p.username, here: this.isHere(p.id) })),
+      players: players.map((p) => ({ id: p.id, username: p.username, here: this.isHere(p.id) })),
       watching,
-      you: viewer ? { id, username: viewer.username, joined: !!this.playerOf(id) } : null,
-      game: st.game == null ? null : (this.rules.view ? this.rules.view(st.game, id) : st.game),
-      results: st.results,
+      you: viewer ? { id, username: viewer.username, joined: !!players.find((p) => p.id === id) } : null,
+      game: shown.game == null ? null : (this.rules.view ? this.rules.view(shown.game, id) : shown.game),
+      results: shown.results,
       leaders: this.leaders,
       rules: {
         minPlayers: this.rules.minPlayers || 1,
@@ -382,6 +392,18 @@ class Room extends EventEmitter {
     if (st.phase !== 'playing' || this.rules.open) return;
     const results = this.rules.result(st.game);
     if (!results) return;
+    // The staging demo plays itself out when nobody is at the table; it
+    // never parks the room on "over" or writes fake results: the table
+    // goes straight back to its lobby underneath.
+    if (st.game.demo) {
+      st.phase = 'lobby';
+      st.game = null;
+      st.results = null;
+      delete st.lobbyPlayers;
+      this.stopClocks();
+      this.changed();
+      return;
+    }
     st.phase = 'over';
     st.results = results;
     this.stopClocks();
@@ -502,7 +524,7 @@ class Room extends EventEmitter {
     app.get('/api/room', (req, res) => {
       try {
         this.touch(req.user);
-        res.json(this.viewFor(req.user || null));
+        res.json(this.viewFor(req.user || null, req.query.demo === '1'));
       } catch (err) {
         fail(res, err);
       }
@@ -513,7 +535,7 @@ class Room extends EventEmitter {
         this.touch(req.user);
         const out = await fn(req.user, req.body || {});
         if (out && out.error) return res.status(out.status || 409).json({ error: out.error });
-        res.json(this.viewFor(req.user));
+        res.json(this.viewFor(req.user, req.query.demo === '1'));
       } catch (err) {
         fail(res, err);
       }

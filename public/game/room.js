@@ -97,8 +97,11 @@
 
     function open() {
       clearTimeout(retryTimer);
+      var query = [];
+      if (token) query.push('token=' + encodeURIComponent(token));
+      if (DEMO) query.push('demo=1');
       var url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/api/live' +
-        (token ? '?token=' + encodeURIComponent(token) : '');
+        (query.length ? '?' + query.join('&') : '');
       var ws;
       try { ws = new WebSocket(url); } catch (e) { return retry(); }
       socket = ws;
@@ -140,7 +143,7 @@
         socket.send(JSON.stringify(Object.assign({ t: t }, body || {})));
         return Promise.resolve();
       }
-      return api('POST', '/api/room/' + path, body || {}).then(setView, function (err) { error(err.message); });
+      return api('POST', '/api/room/' + path + DEMO, body || {}).then(setView, function (err) { error(err.message); });
     }
 
     room.join = function () { return write('join', null, 'join'); };

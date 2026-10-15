@@ -53,11 +53,15 @@ function routes(app) {
   // Staging only: ?demo=1 seats the viewer at a fixed mid-game table
   // (rules.demoGame) with three made-up players, so the populated game can
   // be seen and checked without five real people. Idempotent: it does
-  // nothing while a game is on or over. Never runs in production.
+  // nothing while a game is on or over. The lobby underneath is stashed
+  // (room.viewFor shows it to answers without ?demo=1), and when the demo
+  // plays itself out the room goes back to that lobby. Never in production.
   if (IS_STAGING) {
     app.get('/api/room', (req, res, next) => {
       if (req.query.demo === '1' && req.user && room.state.phase === 'lobby') {
-        room.state.players = [{ id: req.user.id, username: req.user.username }].concat(DEMO_PLAYERS);
+        const st = room.state;
+        st.lobbyPlayers = st.players;
+        st.players = [{ id: req.user.id, username: req.user.username }].concat(DEMO_PLAYERS);
         room.useState(rules.demoGame({ id: req.user.id, username: req.user.username }));
       }
       next();

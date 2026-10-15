@@ -192,7 +192,7 @@
     for (var t = 0; t < map.length; t++) {
       var ld = map[t];
       var st = lands ? lands[ld.id] : null;
-      var token = s('circle', { cx: ld.cx, cy: ld.cy, r: 12, class: 'token-circle', 'data-territory': ld.id }, tokens);
+      var token = s('circle', { cx: ld.cx, cy: ld.cy, r: 12, class: 'token-circle' }, tokens);
       if (taps && st && phase === 'playing' && !g.winner && isMe(currentId(g))) token.classList.add('land-tap');
       var num = s('text', { x: ld.cx, y: ld.cy + 4, class: 'token-num' }, tokens);
       num.textContent = st ? String(st.flags) : '';
@@ -252,10 +252,22 @@
 
   function drawControls(g, playing, mine, step, current) {
     var dice = 0;
-    if (mine && step === 'challenge' && pickedFrom) {
-      var from = g.lands[pickedFrom];
-      if (from && from.owner === view.you.id) dice = Math.min(3, from.flags - 1);
-      else { pickedFrom = null; pickedTo = null; }
+    if (mine && step === 'challenge') {
+      var from = null;
+      if (pickedFrom) {
+        var fl = g.lands[pickedFrom];
+        if (fl && fl.owner === view.you.id) from = fl;
+        else { pickedFrom = null; pickedTo = null; }
+      }
+      if (!from) {
+        // Nothing picked yet: the label counts the dice your strongest
+        // land would roll, so the button always says what it does.
+        for (var key in g.lands) {
+          var own = g.lands[key];
+          if (own.owner === view.you.id && own.flags >= 2 && (!from || own.flags > from.flags)) from = own;
+        }
+      }
+      dice = from ? Math.min(3, from.flags - 1) : 0;
     }
     var neighbour = mine && step === 'challenge' && pickedFrom && pickedTo &&
       g.lands[pickedTo] && g.map.find(function (l) { return l.id === pickedFrom; }).next.indexOf(pickedTo) !== -1;
@@ -289,7 +301,7 @@
 
     el.challenge.hidden = !showChallenge;
     if (showChallenge) {
-      el.challenge.textContent = pickedFrom ? 'Challenge with ' + dice + ' dice' : 'Challenge';
+      el.challenge.textContent = dice > 0 ? 'Challenge with ' + dice + ' dice' : 'Challenge';
       el.challenge.disabled = !(pickedFrom && pickedTo && neighbour);
     }
     el.endTurn.disabled = !mine || (step === 'place' && g.reserve > 0);
@@ -432,11 +444,16 @@
     el.error.hidden = true;
     el.lobbyBody.hidden = false;
     // Your picks are yours only while it is your Challenge step.
-    if (!(view.phase === 'playing' && view.game && !view.game.winner &&
-          view.game.order[view.game.turn % view.game.order.length] === view.you.id &&
-          view.game.step === 'challenge')) {
+    var keepPicks = view.phase === 'playing' && view.game && !view.game.winner && view.you &&
+      view.game.order[view.game.turn % view.game.order.length] === view.you.id &&
+      view.game.step === 'challenge';
+    if (!keepPicks) {
       pickedFrom = null;
       pickedTo = null;
+    } else if (view.game.demo && view.game.pick && pickedFrom === null && pickedTo === null) {
+      // The staging demo arrives with a challenge already picked.
+      pickedFrom = view.game.pick.from;
+      pickedTo = view.game.pick.to;
     }
     // The staging demo's line.
     var demo = !!(view.game && view.game.demo);

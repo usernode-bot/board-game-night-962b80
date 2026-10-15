@@ -36,30 +36,30 @@ const REGIONS = [
 
 const MAP = [
   // Northwood, the green woods in the north west.
-  { id: '1', name: 'Alder', region: 'northwood', cx: 42, cy: 42, path: 'M12 20 L68 14 L72 64 L16 70Z', next: ['2', '3', '5'] },
-  { id: '2', name: 'Birchvale', region: 'northwood', cx: 98, cy: 40, path: 'M68 14 L128 22 L124 62 L72 64Z', next: ['1', '4'] },
-  { id: '3', name: 'Northgate', region: 'northwood', cx: 46, cy: 94, path: 'M16 70 L72 64 L74 118 L22 122Z', next: ['1', '4', '13'] },
-  { id: '4', name: 'Pinecrest', region: 'northwood', cx: 100, cy: 88, path: 'M72 64 L124 62 L132 112 L74 118Z', next: ['2', '3', '9'] },
+  { id: '1', name: 'Alder', region: 'northwood', cx: 40, cy: 40, path: 'M14 26 L44 16 L70 18 L72 64 L48 66 L16 62Z', next: ['2', '3', '5'] },
+  { id: '2', name: 'Birchvale', region: 'northwood', cx: 100, cy: 40, path: 'M70 18 L98 14 L128 24 L124 64 L98 62 L72 64Z', next: ['1', '4'] },
+  { id: '3', name: 'Northgate', region: 'northwood', cx: 42, cy: 92, path: 'M16 62 L48 66 L72 64 L74 120 L44 118 L20 118Z', next: ['1', '4', '13'] },
+  { id: '4', name: 'Pinecrest', region: 'northwood', cx: 100, cy: 92, path: 'M72 64 L98 62 L124 64 L126 116 L100 118 L74 120Z', next: ['2', '3', '9'] },
   // Highpeaks, the mountains along the north and east.
-  { id: '5', name: 'Highhollow', region: 'highpeaks', cx: 186, cy: 36, path: 'M152 16 L214 10 L218 58 L156 62Z', next: ['1', '6', '8', '9'] },
-  { id: '6', name: 'Stormcap', region: 'highpeaks', cx: 248, cy: 34, path: 'M214 10 L282 14 L280 56 L218 58Z', next: ['5', '7', '8'] },
-  { id: '7', name: 'Ridge', region: 'highpeaks', cx: 312, cy: 42, path: 'M282 14 L344 26 L340 70 L280 56Z', next: ['6', '8', '19'] },
-  { id: '8', name: 'Cragford', region: 'highpeaks', cx: 250, cy: 86, path: 'M156 62 L340 70 L322 108 L170 104Z', next: ['5', '6', '7', '10'] },
+  { id: '5', name: 'Highhollow', region: 'highpeaks', cx: 196, cy: 36, path: 'M152 22 L196 14 L244 14 L246 62 L198 62 L150 60Z', next: ['1', '6', '8'] },
+  { id: '6', name: 'Stormcap', region: 'highpeaks', cx: 294, cy: 38, path: 'M244 14 L292 16 L342 26 L340 62 L294 64 L246 62Z', next: ['5', '7', '8'] },
+  { id: '7', name: 'Ridge', region: 'highpeaks', cx: 294, cy: 86, path: 'M246 62 L294 64 L340 62 L338 104 L294 108 L248 110Z', next: ['6', '8', '19'] },
+  { id: '8', name: 'Cragford', region: 'highpeaks', cx: 200, cy: 86, path: 'M150 60 L198 62 L246 62 L248 110 L200 112 L160 104Z', next: ['5', '6', '7', '10'] },
   // Midlands, the farms in the middle of the map.
-  { id: '9', name: 'Oldmill', region: 'midlands', cx: 150, cy: 160, path: 'M112 140 L184 134 L182 176 L118 180Z', next: ['10', '12', '4', '5'] },
-  { id: '10', name: 'Granary', region: 'midlands', cx: 218, cy: 158, path: 'M184 134 L256 142 L252 178 L182 176Z', next: ['9', '11', '8', '17'] },
-  { id: '11', name: 'Fernvale', region: 'midlands', cx: 214, cy: 195, path: 'M182 176 L252 178 L244 212 L178 214Z', next: ['10', '12', '17'] },
-  { id: '12', name: 'Millbrook', region: 'midlands', cx: 152, cy: 195, path: 'M118 180 L182 176 L178 214 L126 210Z', next: ['9', '11', '14'] },
+  { id: '9', name: 'Oldmill', region: 'midlands', cx: 146, cy: 156, path: 'M116 142 L148 134 L182 140 L182 176 L146 178 L114 172Z', next: ['10', '12', '4'] },
+  { id: '10', name: 'Granary', region: 'midlands', cx: 214, cy: 156, path: 'M182 140 L214 134 L248 142 L246 174 L214 178 L182 176Z', next: ['9', '11', '8', '17'] },
+  { id: '11', name: 'Fernvale', region: 'midlands', cx: 214, cy: 196, path: 'M182 176 L214 178 L246 174 L248 208 L216 216 L182 210Z', next: ['10', '12', '17'] },
+  { id: '12', name: 'Millbrook', region: 'midlands', cx: 146, cy: 196, path: 'M114 172 L146 178 L182 176 L182 210 L148 218 L116 210Z', next: ['9', '11', '14'] },
   // Marsh Coast, the fens along the south west shore.
-  { id: '13', name: 'Reeds', region: 'marsh', cx: 50, cy: 252, path: 'M14 232 L84 226 L82 272 L18 278Z', next: ['14', '15', '3'] },
-  { id: '14', name: 'Marshside', region: 'marsh', cx: 116, cy: 251, path: 'M84 226 L152 236 L150 270 L82 272Z', next: ['13', '16', '12'] },
-  { id: '15', name: 'Lowfen', region: 'marsh', cx: 54, cy: 295, path: 'M18 278 L82 272 L86 318 L26 314Z', next: ['13', '16', '18'] },
-  { id: '16', name: 'Creekmouth', region: 'marsh', cx: 118, cy: 293, path: 'M82 272 L150 270 L156 312 L86 318Z', next: ['14', '15', '18'] },
+  { id: '13', name: 'Reeds', region: 'marsh', cx: 48, cy: 250, path: 'M18 240 L48 230 L82 236 L82 272 L50 274 L18 266Z', next: ['14', '15', '3'] },
+  { id: '14', name: 'Marshside', region: 'marsh', cx: 116, cy: 250, path: 'M82 236 L118 230 L150 240 L148 270 L116 274 L82 272Z', next: ['13', '16', '12'] },
+  { id: '15', name: 'Lowfen', region: 'marsh', cx: 48, cy: 292, path: 'M18 266 L50 274 L82 272 L82 306 L50 316 L20 306Z', next: ['13', '16', '18'] },
+  { id: '16', name: 'Creekmouth', region: 'marsh', cx: 116, cy: 292, path: 'M82 272 L116 274 L148 270 L150 302 L116 314 L84 306Z', next: ['14', '15'] },
   // Sunreach, the dunes and harbours of the south east.
-  { id: '17', name: 'Sundock', region: 'sunreach', cx: 236, cy: 252, path: 'M200 232 L272 228 L270 272 L204 276Z', next: ['18', '19', '11', '10'] },
-  { id: '18', name: 'Dune', region: 'sunreach', cx: 238, cy: 295, path: 'M204 276 L270 272 L272 318 L210 314Z', next: ['17', '20', '16', '15'] },
-  { id: '19', name: 'Shorehead', region: 'sunreach', cx: 306, cy: 252, path: 'M272 228 L342 238 L338 270 L270 272Z', next: ['17', '20', '7'] },
-  { id: '20', name: 'Sunport', region: 'sunreach', cx: 306, cy: 292, path: 'M270 272 L338 270 L344 312 L272 318Z', next: ['18', '19'] },
+  { id: '17', name: 'Sundock', region: 'sunreach', cx: 232, cy: 250, path: 'M200 236 L232 228 L268 234 L268 270 L234 272 L198 264Z', next: ['18', '19', '11', '10'] },
+  { id: '18', name: 'Dune', region: 'sunreach', cx: 232, cy: 292, path: 'M198 264 L234 272 L268 270 L268 302 L234 314 L200 304Z', next: ['17', '20', '15'] },
+  { id: '19', name: 'Shorehead', region: 'sunreach', cx: 306, cy: 250, path: 'M268 234 L302 226 L340 236 L338 268 L304 272 L268 270Z', next: ['17', '20', '7'] },
+  { id: '20', name: 'Sunport', region: 'sunreach', cx: 306, cy: 292, path: 'M268 270 L304 272 L338 268 L340 300 L304 314 L270 306Z', next: ['18', '19'] },
 ];
 
 const BY_ID = Object.fromEntries(MAP.map((l) => [l.id, l]));
@@ -67,14 +67,15 @@ const BY_ID = Object.fromEntries(MAP.map((l) => [l.id, l]));
 // The dotted sea lanes: [from, to, line on the map]. The same pairs are
 // already in `next`; this is only how they are drawn.
 const LANES = [
-  ['4', '9', 'M112 118 L130 140'],
-  ['1', '5', 'M84 40 L152 36'],
-  ['3', '13', 'M40 122 L40 228'],
-  ['8', '10', 'M230 104 L222 136'],
-  ['12', '14', 'M128 210 L140 234'],
-  ['10', '17', 'M232 212 L238 230'],
-  ['15', '18', 'M60 306 L204 298'],
-  ['7', '19', 'M330 104 L322 236'],
+  ['4', '9', 'M100 119 L126 140'],
+  ['1', '5', 'M126 40 L148 40'],
+  ['3', '13', 'M36 120 L40 232'],
+  ['8', '10', 'M210 112 L222 136'],
+  ['12', '14', 'M140 217 L124 232'],
+  ['10', '17', 'M247 172 Q256 202 240 231'],
+  ['11', '17', 'M214 216 L230 229'],
+  ['15', '18', 'M52 317 Q120 327 197 301'],
+  ['7', '19', 'M330 105 Q352 170 320 230'],
 ];
 
 function clone(game) {
@@ -404,6 +405,9 @@ function demoGame(viewer) {
     winner: null,
     out: [],
     demo: true,
+    // The challenge the demo opens with: Pinecrest picked, Oldmill the
+    // target, so the pick outline and arrow are on the map at once.
+    pick: { from: '4', to: '9' },
   };
   seats.forEach((s, seat) => { game.seats[s.id] = { username: s.username, seat }; });
   const held = {
