@@ -1,0 +1,34 @@
+{
+  "description": "A board game",
+  "icon": {
+    "emoji": "🎲"
+  },
+  "secrets": [],
+  "governance": {
+    "preset": "you_or_the_group"
+  },
+  "tests": [
+    {
+      "id": "board.board",
+      "name": "The board shows, from start to finish",
+      "path": "/",
+      "expectSelector": "#board [data-square=\"30\"]",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "api.js",
+        "game/**"
+      ]
+    },
+    {
+      "name": "The lobby lists who is playing",
+      "path": "/",
+      "expectSelector": "#title #players [data-player]"
+    },
+    {
+      "name": "The leaderboard shows past winners",
+      "path": "/",
+      "expectSelector": "#leaders [data-leader]"
+    }
+  ]
+}
