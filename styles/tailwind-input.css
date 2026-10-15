@@ -29,30 +29,42 @@
  */
 @layer base {
   :root {
-    --ground: 250 250 249;    /* the page */
+    /* A parchment map. */
+    --ground: 244 240 232;    /* the page */
     --surface: 255 255 255;   /* lists, cards, fields */
-    --raised: 245 245 244;    /* hovers, badges */
-    --fg: 28 25 23;           /* text */
-    --muted: 87 83 78;        /* secondary text */
-    --line: 231 229 228;      /* borders, dividers, skeletons */
-    --accent: 15 118 110;     /* the one accent */
+    --raised: 236 231 221;    /* hovers, badges */
+    --fg: 32 28 24;           /* text */
+    --muted: 93 86 78;        /* secondary text */
+    --line: 221 214 201;      /* borders, dividers, skeletons */
+    --accent: 176 58 30;      /* the one accent: the action colour */
     --on-accent: 255 255 255; /* text on the accent */
     --danger: 185 28 28;
     --on-danger: 255 255 255;
-    --focus: 13 148 136;      /* the keyboard focus ring */
+    --focus: 176 58 30;       /* the keyboard focus ring */
+    --sea: 206 222 222;       /* the water between the regions */
+    --land: 250 246 238;      /* unclaimed land, flag tokens */
+    /* The player colours, the same in both looks. */
+    --p1: 29 106 150;
+    --p2: 58 120 66;
+    --p3: 138 82 148;
+    --p4: 176 120 20;
+    --p5: 20 120 130;
+    --p6: 170 60 90;
   }
   .dark {
-    --ground: 12 10 9;
-    --surface: 28 25 23;
-    --raised: 41 37 36;
-    --fg: 245 245 244;
-    --muted: 168 162 158;
-    --line: 68 64 60;
-    --accent: 45 212 191;
-    --on-accent: 4 47 46;
+    --ground: 28 25 22;
+    --surface: 40 36 32;
+    --raised: 52 47 42;
+    --fg: 242 237 228;
+    --muted: 176 168 156;
+    --line: 72 66 58;
+    --accent: 232 120 90;
+    --on-accent: 40 14 6;
     --danger: 248 113 113;
     --on-danger: 69 10 10;
-    --focus: 94 234 212;
+    --focus: 232 120 90;
+    --sea: 30 48 52;
+    --land: 40 36 32;
   }
   /* el.hidden = true hides an element even when a class gives it a display
      (flex, the components below). */
@@ -82,13 +94,21 @@
   .btn-secondary {
     @apply inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg px-4 text-body font-medium
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2
-      focus-visible:ring-offset-ground disabled:cursor-not-allowed disabled:opacity-50;
+      focus-visible:ring-offset-ground disabled:cursor-not-allowed;
   }
   .btn-primary {
     @apply bg-accent text-on-accent hover:brightness-95;
   }
   .btn-secondary {
     @apply border border-line bg-surface text-fg hover:bg-raised;
+  }
+  /* A button that cannot be pressed yet stays solid: the primary rests on
+     the raised colour in muted text, not an alpha-faded fill. */
+  .btn-primary:disabled {
+    @apply border border-line bg-raised text-muted opacity-100;
+  }
+  .btn-secondary:disabled {
+    @apply opacity-50;
   }
 
   /* Text inputs, selects and textareas: <input class="field">, 44 px tall.
@@ -114,9 +134,10 @@
     @apply rounded-xl border border-line bg-surface p-4;
   }
 
-  /* The label above a section: sentence case, never uppercase or tracked. */
+  /* The label above a section: sentence case, never uppercase or tracked.
+     Its edges line up with the list below it and the column's gutter. */
   .section-label {
-    @apply mb-2 px-1 text-small font-medium text-muted;
+    @apply mb-2 mt-4 px-4 text-small font-medium text-muted;
   }
 
   /* The states of anything that loads data. Show exactly one at a time:

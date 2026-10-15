@@ -24,6 +24,8 @@
 
 (function () {
   var token = new URLSearchParams(window.location.search).get('token') || '';
+  // The staging demo travels with the page's own ?demo=1.
+  var DEMO = new URLSearchParams(window.location.search).get('demo') === '1' ? '?demo=1' : '';
 
   function api(method, url, body) {
     var headers = { 'x-usernode-token': token };
@@ -78,7 +80,7 @@
 
     function poll() {
       if (live || room.away()) return schedulePoll();
-      api('GET', '/api/room').then(function (v) {
+      api('GET', '/api/room' + DEMO).then(function (v) {
         setView(v);
         if (!live) setStatus('asking');
       }, function () {
@@ -95,8 +97,11 @@
 
     function open() {
       clearTimeout(retryTimer);
+      var query = [];
+      if (token) query.push('token=' + encodeURIComponent(token));
+      if (DEMO) query.push('demo=1');
       var url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/api/live' +
-        (token ? '?token=' + encodeURIComponent(token) : '');
+        (query.length ? '?' + query.join('&') : '');
       var ws;
       try { ws = new WebSocket(url); } catch (e) { return retry(); }
       socket = ws;
@@ -138,7 +143,7 @@
         socket.send(JSON.stringify(Object.assign({ t: t }, body || {})));
         return Promise.resolve();
       }
-      return api('POST', '/api/room/' + path, body || {}).then(setView, function (err) { error(err.message); });
+      return api('POST', '/api/room/' + path + DEMO, body || {}).then(setView, function (err) { error(err.message); });
     }
 
     room.join = function () { return write('join', null, 'join'); };
@@ -182,7 +187,7 @@
 
     // The first view comes over a plain request, so the screen fills even
     // before (or without) the live connection; then the connection opens.
-    api('GET', '/api/room').then(function (v) {
+    api('GET', '/api/room' + DEMO).then(function (v) {
       setView(v);
       setStatus('asking');
     }, function (err) {

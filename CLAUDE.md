@@ -129,24 +129,40 @@ tables you've marked private), etc.
 
 ## About Board Game Night
 
-A board game
-
-_(add a sentence or two more of product context here so Claude Code has a
-shared understanding of what this app is for)_
+A simplified game of taking land for the whole project, from the spec of
+its first version (Homeroom issue #1): 20 lands in 5 regions dealt out at
+random, two-step turns (place flags, then challenge a neighbour with dice),
+the last player holding land wins. The wording is deliberately about flags
+and challenges — never troops, attacks or weapons — and there is no
+gambling anywhere in it. Players' colours are fixed per seat (the same
+player keeps their colour in both looks) and are drawn at half strength
+over the land fills.
 
 ## Design
 
 This app's look. The first real version fills in the blanks; every later
 change follows it, and updates it when a request changes the look on purpose.
 
-- **Palette:** _(name the accent, any second colour and the neutrals, e.g.
-  "accent: tomato red; second: basil green; neutrals: warm greys")_
-- **Signature element:** _(the one thing on screen drawn from this app's
-  subject, which no other app would have)_
+- **Palette:** parchment. Light: warm parchment neutrals (ground 244 240
+  232, surface 255 255 255, raised 236 231 221, fg 32 28 24, muted 93 86
+  78, line 221 214 201), sea 206 222 222, land fill 250 246 238, accent
+  rust red 176 58 30 with white on-accent. Dark: a night map (ground 28 25
+  22, surface 40 36 32, raised 52 47 42, fg 242 237 228, muted 176 168
+  156, line 72 66 58, sea 30 48 52, accent 232 120 90 with on-accent 40 14
+  6). Player colours are the same in both looks: blue 29 106 150, green 58
+  120 66, purple 138 82 148, gold 176 120 20, teal 20 120 130, rose 170 60 90.
+- **Signature element:** the hand-drawn parchment map — irregular land
+  outlines, dotted sea lanes, a round flag-count token on every land, the
+  picked land in a thick accent outline with the target dashed and a
+  curved arrow between them.
 - **Type scale:** `text-title`, `text-heading`, `text-body`, `text-small`
-  _(change their sizes in `tailwind.config.js` if you must, not their number)_
-- **One fixed look:** _(only for an app drawn as its own scene, such as a
-  game: which look, and why. Otherwise delete this line.)_
+  on a rounded face (`ui-rounded` is the app's sans in
+  `tailwind.config.js`).
+- **One fixed look:** the game itself is drawn as its own scene (the map
+  fills the screen and owns its look), but the scene's colours are all
+  tokens, so the whole thing still follows the viewer's Homeroom theme —
+  parchment in the light, a night map in the dark. No theme picker of its
+  own.
 
 The kit is in `styles/tailwind-input.css`: colour tokens with a light and
 a dark value (named in `tailwind.config.js`), and a few components

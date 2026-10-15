@@ -9,10 +9,10 @@
   },
   "tests": [
     {
-      "id": "board.board",
-      "name": "The board shows, from start to finish",
-      "path": "/",
-      "expectSelector": "#board [data-square=\"30\"]",
+      "id": "map.map",
+      "name": "The map shows all 20 lands with their flags",
+      "path": "/?demo=1",
+      "expectSelector": "#map [data-territory=\"20\"]",
       "visual": true,
       "impact": [
         "public/**",
